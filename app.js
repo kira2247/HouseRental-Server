@@ -11,7 +11,7 @@ const housesRoute = require('./routes/houses');
 const userRoute = require('./routes/user');
 
 //DB Setup
-mongoose.connect('mongodb://localhost:rental/rental');
+mongoose.connect('mongodb://heroku_lhgfwx4j:heroku_lhgfwx4j@ds127963.mlab.com:27963/heroku_lhgfwx4j');
 app.use(morgan('combined'));
 app.use(cors());
 app.use(function(req, res, next) {
