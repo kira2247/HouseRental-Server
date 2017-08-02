@@ -8,15 +8,17 @@ const cors = require('cors');
 
 //routes
 const housesRoute = require('./routes/houses');
+const userRoute = require('./routes/user');
 
 //DB Setup
 mongoose.connect('mongodb://localhost:rental/rental');
-
 app.use(morgan('combined'));
 app.use(cors());
-app.use(bodyParser.json({type: '*/*'}));
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: false }));
 
 app.use('/houses', housesRoute);
+app.use('/user', userRoute);
 
 //catch 404 and forward to error handler
 app.use((req,res,next) => {
