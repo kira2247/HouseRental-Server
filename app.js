@@ -11,7 +11,7 @@ const housesRoute = require('./routes/houses');
 const userRoute = require('./routes/user');
 
 //DB Setup
-mongoose.connect('mongodb://tanhuynh1008:Loveu4ever@ds127963.mlab.com:27963/heroku_lhgfwx4j');
+mongoose.connect('mongodb://tanhuynh1008:Loveu4ever@ds129043.mlab.com:29043/heroku_prg7ghqc');
 app.use(morgan('combined'));
 app.use(cors());
 app.use(function(req, res, next) {
@@ -21,6 +21,11 @@ app.use(function(req, res, next) {
     res.header("Access-Control-Allow-Headers", 'Origin,X-Requested-With,Content-Type,Accept,content-type,application/json');
     next();
 });
+
+app.get('/favicon.ico', function(req, res) {
+    res.status(204);
+});
+
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 
