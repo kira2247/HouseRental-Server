@@ -154,7 +154,7 @@ router.post('/add/:houseid/:roomid/renter', (req,res,next) => {
 		if(req.files.length !== 0) {
 			Promise.map(req.files , image => {
 					dUri.format(path.extname(image.originalname).toString(), image.buffer);
-					return cloudinary.v2.uploader.upload(dUri.content, (err,result) =>{
+					return cloudinary.v2.uploader.upload(dUri.content, {width: 960, height: 640}, (err,result) =>{
 					if(err) {
 						res.status(500).json({
 							error: err
@@ -592,7 +592,7 @@ router.patch('/update/house/:houseid/room/:roomid/renter/:renterid', (req,res,ne
 		if(req.files.length!== 0) {
 			Promise.map(req.files , image => {
 					dUri.format(path.extname(image.originalname).toString(), image.buffer);
-					return cloudinary.v2.uploader.upload(dUri.content, (err,result) =>{
+					return cloudinary.v2.uploader.upload(dUri.content, {width: 960, height: 640}, (err,result) =>{
 					if(err) {
 						res.status(500).json({
 							error: err
