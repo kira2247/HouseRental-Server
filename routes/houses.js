@@ -160,8 +160,8 @@ router.post('/add/:houseid/:roomid/renter', (req,res,next) => {
 							error: err
 						});
 					}
-					const {url, public_id} = result;
-					const data = {url, _id: public_id};
+					const {secure_url, public_id} = result;
+					const data = {url: secure_url, _id: public_id};
 					cidImages.push(data);
 					})
 				}).then( () => {
@@ -596,8 +596,8 @@ router.patch('/update/house/:houseid/room/:roomid/renter/:renterid', (req,res,ne
 							error: err
 						});
 					}
-					const {url, public_id} = result;
-					const data = {url, _id: public_id};
+					const {secure_url, public_id} = result;
+					const data = {url:secure_url, _id: public_id};
 					house.rooms.id(roomid).renters.id(renterid).cidImages.push(data);
 					})
 				}).then( () => {
