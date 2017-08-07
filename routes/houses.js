@@ -539,17 +539,15 @@ router.patch('/update/house/:houseid/room/:roomid', (req,res,next) => {
 				})
 			}
 
-			House.findOneAndUpdate({'_id':houseid, 'rooms._id': roomid}, {$set: { 'rooms.$': {roomName, roomPrice, elecRate, waterRate, note}}}, (err,house) => {
-				if(err) {
-					return res.status(500).json({
-						error: 'Invalid room'
-					})
-				}
-				
-				return res.status(200).json({
-					message: 'Room Edited Successfully'
-				})
-			})
+			house.rooms.id(roomid).set({roomName, roomPrice, elecRate, waterRate, note});
+			house.save((err, result)=> {
+						if (err) {
+	                		res.status(500).json({
+	                			message: 'Some error occured'
+	                		})
+	           			}
+		            	res.status(200).json({message: 'Room Edited Successfully'});
+			});
 		})		
 	})
 })
@@ -611,7 +609,7 @@ router.patch('/update/house/:houseid/room/:roomid/renter/:renterid', (req,res,ne
 	                		})
 	           			}
 		            	res.status(200).json({message: 'Renter Edited Successfully'});
-						});
+					});
 				});	
 		} else {
 			house.rooms.id(roomid).renters.id(renterid).set({fullName,cidNum,dob,homeTown,startRentingDate});
