@@ -1327,6 +1327,10 @@ node-pre-gyp@0.6.32, node-pre-gyp@^0.6.29:
     tar "~2.2.1"
     tar-pack "~3.3.0"
 
+nodemailer@^4.0.1:
+  version "4.0.1"
+  resolved "https://registry.yarnpkg.com/nodemailer/-/nodemailer-4.0.1.tgz#b95864b07facee8287e8232effd6f1d56ec75ab2"
+
 nodemon@^1.11.0:
   version "1.11.0"
   resolved "https://registry.yarnpkg.com/nodemon/-/nodemon-1.11.0.tgz#226c562bd2a7b13d3d7518b49ad4828a3623d06c"
@@ -2042,6 +2046,10 @@ xdg-basedir@^2.0.0:
   resolved "https://registry.yarnpkg.com/xdg-basedir/-/xdg-basedir-2.0.0.tgz#edbc903cc385fc04523d966a335504b5504d1bd2"
   dependencies:
     os-homedir "^1.0.0"
+
+xoauth2@^1.2.0:
+  version "1.2.0"
+  resolved "https://registry.yarnpkg.com/xoauth2/-/xoauth2-1.2.0.tgz#f2eefac11472c971ea3bc46e554eb4b1232146e5"
 
 xtend@^4.0.0, xtend@^4.0.1:
   version "4.0.1"

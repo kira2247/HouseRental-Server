@@ -12,6 +12,37 @@ const Promise = require("bluebird");
 const jwt = require('jsonwebtoken');
 const config = require('../config');
 const moment = require('moment');
+const nodemailer = require('nodemailer');
+
+let transporter = nodemailer.createTransport (
+	({
+        service: 'gmail',
+        auth: {
+            type: 'OAuth2',
+            user: 'tanhuynh1008@gmail.com',
+            clientId: '956945889024-87gi3vr3jjh54pbn2p77bsbjt4t56iim.apps.googleusercontent.com',
+            clientSecret: 'psaXItkwxU3O-d1z4hInuZEE',
+            refreshToken: '1/Fq7PdPlKs8KKDaeUwWerzL6YdY1Aw5q-ic0rjrxujys'
+   }
+}));
+
+let mailOptions = {
+	from: 'tanhuynh1008@gmail.com',
+	to: '"tanhuynh2247@gmail.com", "ookiraoo_2247@yahoo.com"',
+	subject: 'Nodemailer test',
+	text: 'Hello World 2!!'
+}
+
+router.get('/email', (req,res,next) => {
+	transporter.sendMail(mailOptions, (err,res) => {
+		if(err) {
+			console.log('error')
+			return console.log(err);
+		}
+		console.log('email')
+		return console.log(res);
+	})
+})
 
 //Config multer
 const storage = multer.memoryStorage();
@@ -937,7 +968,6 @@ router.get('/check/ownerShip', (req,res,next) => {
 	const {houseid,token} = req.query;
 
 	if (!token) {
-		console.log('abc');
 		return res.status(200).json({ownerShip: false});
 	} else {
 		jwt.verify(token, config.secret , function (err, decoded) {
@@ -961,6 +991,8 @@ router.get('/check/ownerShip', (req,res,next) => {
 					})
 				}
 
+				console.log(house.creator.toString());
+				console.log(decoded.sub)
 				return res.status(200).json({
 					ownerShip:false
 				})

@@ -12,6 +12,7 @@ const userRoute = require('./routes/user');
 
 // mongodb://localhost:rental/rental
 // mongodb://tanhuynh1008:Loveu4ever@ds129043.mlab.com:29043/heroku_prg7ghqc
+// https://thue-nha.herokuapp.com
 //DB Setup
 mongoose.connect('mongodb://tanhuynh1008:Loveu4ever@ds129043.mlab.com:29043/heroku_prg7ghqc');
 app.use(morgan('combined'));
