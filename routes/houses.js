@@ -13,35 +13,172 @@ const jwt = require('jsonwebtoken');
 const config = require('../config');
 const moment = require('moment');
 const nodemailer = require('nodemailer');
+const hbs = require('nodemailer-express-handlebars');
 
 let transporter = nodemailer.createTransport (
 	({
         service: 'gmail',
         auth: {
             type: 'OAuth2',
-            user: 'tanhuynh1008@gmail.com',
-            clientId: '956945889024-87gi3vr3jjh54pbn2p77bsbjt4t56iim.apps.googleusercontent.com',
-            clientSecret: 'psaXItkwxU3O-d1z4hInuZEE',
-            refreshToken: '1/Fq7PdPlKs8KKDaeUwWerzL6YdY1Aw5q-ic0rjrxujys'
+            user: 'thuenha2017@gmail.com',
+            clientId: '709634733602-85v4l7h07qdob3glp5mhhrnc60e9f2dl.apps.googleusercontent.com',
+            clientSecret: config.clientSecret,
+            refreshToken: '1/DvbwZTQU7YTUyZN4vnWByk14Bp2dFjnL0ZL1S_4TEOI'
    }
 }));
+transporter.use('compile', hbs({
+	viewPath:'mailTemplate',
+	extName: '.ejs'
+}))
 
-let mailOptions = {
-	from: 'tanhuynh1008@gmail.com',
-	to: '"tanhuynh2247@gmail.com", "ookiraoo_2247@yahoo.com"',
-	subject: 'Nodemailer test',
-	text: 'Hello World 2!!'
-}
+router.post('/invoicemail/:houseid/:roomid/:recordid', (req,res,next) => {
+	const {houseid, roomid, recordid} = req.params;
+	const decoded = jwt.decode(req.query.token);
 
-router.get('/email', (req,res,next) => {
-	transporter.sendMail(mailOptions, (err,res) => {
+	House.findOne({'_id': houseid, 'rooms._id': roomid, 'rooms.records._id': recordid}, (err, house) => {
 		if(err) {
-			console.log('error')
-			return console.log(err);
+			return res.status(500).json({
+				message: 'Some error occurred'
+			})
 		}
-		console.log('email')
-		return console.log(res);
-	})
+
+		if(!house) {
+			return res.status(500).json({
+				message: 'Bad House Info'
+			})
+		}
+
+		if(house.creator.toString() !== decoded.sub) {
+				return res.status(500).json({
+					message: 'User not match!'
+			})
+		}
+
+
+		const {ownersName,address,phoneNumber, paymentMethod} = house
+		const {roomName, elecRate, waterRate} = house.rooms.id(roomid);
+		const {paymentTime,note, usedElecNum, usedWaterNum, roomPrice, otherPayment} = house.rooms.id(roomid).records.id(recordid);
+
+		//get list of renters email to send
+		const templateSub = `Hóa Đơn Phòng ${roomName} (${moment(paymentTime).format("DD-MM-YYYY")})`
+
+		let mailOptions = {
+			from: 'thuenha2017@gmail.com',
+			to: _.compact(_.map(house.rooms.id(roomid).renters, 'email')).toString(),
+			subject: templateSub,
+			template: 'invoicemail',
+			context: {
+				roomName: roomName,
+				paymentMethod: paymentMethod,
+				date: moment(paymentTime).format("DD-MM-YYYY"),
+				ownersName: ownersName,
+				address: address,
+				phoneNumber: phoneNumber,
+				note: note,
+				roomPrice: roomPrice.toLocaleString('vn-VN', {style: 'currency', currency: 'VND'}),
+				usedElecNum: usedElecNum,
+				elecRate: "₫"+elecRate+"/kWh",
+				calElec: (usedElecNum*elecRate).toLocaleString('vn-VN', {style: 'currency', currency: 'VND'}),
+				usedWaterNum: usedWaterNum,
+				waterRate: "₫"+waterRate+"/m3",
+				calWater: (usedWaterNum*waterRate).toLocaleString('vn-VN', {style: 'currency', currency: 'VND'}),
+				otherPayment: otherPayment.toLocaleString('vn-VN', {style: 'currency', currency: 'VND'}),
+				total: _.sum([otherPayment,roomPrice,usedElecNum*elecRate,usedWaterNum*waterRate]).toLocaleString('vn-VN', {style: 'currency', currency: 'VND'})
+			}
+		}
+
+		transporter.sendMail(mailOptions, (err,result) => {
+
+			if(err) {
+				return res.status(403).json({
+					message: err
+				})
+			}
+			
+			return res.status(200).json({
+				message: 'Đã Gửi Hóa Đơn !'
+			})
+		})
+	})	
+})
+
+router.post('/paidmail/:houseid/:roomid/:recordid', (req,res,next) => {
+	const {houseid, roomid, recordid} = req.params;
+	const decoded = jwt.decode(req.query.token);
+
+	House.findOne({'_id': houseid, 'rooms._id': roomid, 'rooms.records._id': recordid}, (err, house) => {
+		if(err) {
+			return res.status(500).json({
+				message: 'Some error occurred'
+			})
+		}
+
+		if(!house) {
+			return res.status(500).json({
+				message: 'Bad House Info'
+			})
+		}
+
+		if(house.creator.toString() !== decoded.sub) {
+				return res.status(500).json({
+					message: 'User not match!'
+			})
+		}
+
+		house.rooms.id(roomid).records.id(recordid).set({payment: true});
+		house.save();
+
+		const {ownersName,address,phoneNumber, paymentMethod} = house
+		const {roomName, elecRate, waterRate} = house.rooms.id(roomid);
+		const {paymentTime,note, usedElecNum, usedWaterNum, roomPrice, otherPayment} = house.rooms.id(roomid).records.id(recordid);
+
+		//get list of renters email to send
+		const templateSub = `Xác Nhận Thanh Toán Phòng ${roomName} (${moment(paymentTime).format("DD-MM-YYYY")})`
+		if(_.compact(_.map(house.rooms.id(roomid).renters, 'email')).toString() !== '') {
+
+			let mailOptions = {
+			from: 'thuenha2017@gmail.com',
+			to: _.compact(_.map(house.rooms.id(roomid).renters, 'email')).toString(),
+			subject: templateSub,
+			template: 'paidmail',
+			context: {
+				roomName: roomName,
+				date: moment(paymentTime).format("DD-MM-YYYY"),
+				ownersName: ownersName,
+				address: address,
+				phoneNumber: phoneNumber,
+				note: note,
+				roomPrice: roomPrice.toLocaleString('vn-VN', {style: 'currency', currency: 'VND'}),
+				usedElecNum: usedElecNum,
+				elecRate: "₫"+elecRate+"/kWh",
+				calElec: (usedElecNum*elecRate).toLocaleString('vn-VN', {style: 'currency', currency: 'VND'}),
+				usedWaterNum: usedWaterNum,
+				waterRate: "₫"+waterRate+"/m3",
+				calWater: (usedWaterNum*waterRate).toLocaleString('vn-VN', {style: 'currency', currency: 'VND'}),
+				otherPayment: otherPayment.toLocaleString('vn-VN', {style: 'currency', currency: 'VND'}),
+				total: _.sum([otherPayment,roomPrice,usedElecNum*elecRate,usedWaterNum*waterRate]).toLocaleString('vn-VN', {style: 'currency', currency: 'VND'})
+				}
+			}	
+
+			transporter.sendMail(mailOptions, (err,result) => {
+
+				if(err) {
+					return res.status(403).json({
+						message: err
+					})
+				}
+				
+				return res.status(200).json({
+					message: 'Xác Nhận Thanh Toán Thành Công !'
+				})
+			})
+		} else {
+
+			return res.status(200).json({
+				message: 'Xác Nhận Thanh Toán Thành Công !'
+			})	
+		}	
+	})	
 })
 
 //Config multer
@@ -65,7 +202,7 @@ cloudinary.config({
   api_secret: 'occOyRMQ3ya90S5Rg9BD7OzVBXk' 
 });
 
-router.use(['add', '/edit', '/update', '/form', '/details/:houseid/:roomid'], (req,res,next) => {
+router.use(['/add', '/edit', '/update', '/form', '/details', '/invoicemail', '/paidmail'], (req,res,next) => {
 		jwt.verify(req.query.token, config.secret , function (err, decoded) {
         if (err) {
             return res.status(401).json({
@@ -87,9 +224,9 @@ router.post('/add', (req,res,next) => {
             });
         }
 
-        const {ownersName, address, phoneNumber, rentalTargets, totalRoom} = req.body;
-	
-		const house = new House({ ownersName, address, phoneNumber, rentalTargets, totalRoom, creator: user});
+        const {ownersName, address, phoneNumber, rentalTargets, totalRoom, paymenMethod} = req.body;
+
+		const house = new House({ ownersName, address, phoneNumber, rentalTargets, totalRoom, paymenMethod, creator: user});
 
 		house.save((err) => {
 			if (err) {
@@ -128,7 +265,7 @@ router.post('/add/:houseid', (req,res,next) => {
 
 			if(house.creator.toString() !== decoded.sub) {
 				return res.status(500).json({
-					error: 'User not match!'
+					message: 'User not match!'
 				})
 			}
 
@@ -157,7 +294,7 @@ router.post('/add/:houseid/:roomid/renter', (req,res,next) => {
             })
         }     
 
-        const {fullName,cidNum,dob,homeTown,startRentingDate} = req.body;
+        const {fullName,cidNum,dob,homeTown,startRentingDate, email} = req.body;
         const {houseid, roomid} = req.params;
         const cidImages = [];
         const decoded = jwt.decode(req.query.token);
@@ -178,7 +315,7 @@ router.post('/add/:houseid/:roomid/renter', (req,res,next) => {
 
 		if(house.creator.toString() !== decoded.sub) {
 			return res.status(500).json({
-				error: 'User not match!'
+				message: 'User not match!'
 			})
 		}
 
@@ -196,7 +333,7 @@ router.post('/add/:houseid/:roomid/renter', (req,res,next) => {
 					cidImages.push(data);
 					})
 				}).then( () => {
-					house.rooms.id(roomid).renters.push({fullName,cidNum,dob,homeTown,startRentingDate, cidImages});
+					house.rooms.id(roomid).renters.push({fullName,cidNum,dob,homeTown,startRentingDate, cidImages, email});
 					house.save((err, result)=> {
 						if (err) {
 	                		return next(err);
@@ -206,7 +343,7 @@ router.post('/add/:houseid/:roomid/renter', (req,res,next) => {
 						});
 				});	
 		} else {
-			house.rooms.id(roomid).renters.push({fullName,cidNum,dob,homeTown,startRentingDate, cidImages});
+			house.rooms.id(roomid).renters.push({fullName,cidNum,dob,homeTown,startRentingDate, cidImages, email});
 			house.save((err, result)=> {
 				if (err) {
 	                return next(err);
@@ -241,7 +378,7 @@ router.post('/add/:houseid/:roomid/record', (req,res,next) => {
 
 		if(house.creator.toString() !== decoded.sub) {
 			return res.status(500).json({
-				error: 'User not match!'
+				message: 'User not match!'
 			})
 		}
 		
@@ -260,17 +397,19 @@ router.post('/add/:houseid/:roomid/record', (req,res,next) => {
 
 
 //get list of houses
-router.get('/', (req,res,next) => {
+router.get('/details', (req,res,next) => {
 	const listReturn = ['ownersName', 'address', 'phoneNumber', 'rentalTargets', 'totalRoom', 'creator'];
+	const decoded = jwt.decode(req.query.token);
 
-	House.find({}).populate('creator', 'displayName').select(listReturn).exec((err, houses) => {
+	House.find({creator: decoded.sub}).populate('creator', 'displayName').select(listReturn).exec((err, houses) => {
 		if(err) {
 			return res.status(500).json({
 				message: 'There are some error',
 				error: err
 			});
 		}
-		res.status(200).json({
+
+		return res.status(200).json({
 			houses: houses,
 			message: 'Get All House Successfully'
 		});
@@ -280,6 +419,8 @@ router.get('/', (req,res,next) => {
 //get house rooms with house id
 router.get('/details/:id', (req,res,next) => {
 	const {id} = req.params;
+	const decoded = jwt.decode(req.query.token);
+
 	House.findOne({_id: id}).exec((err,house) => {
 
 		if(err) {
@@ -293,6 +434,12 @@ router.get('/details/:id', (req,res,next) => {
 			return res.status(500).json({
 				message: 'Can not find any house'
 			})
+		}
+
+		if(house.creator.toString() !== decoded.sub) {
+			return res.status(500).json({
+				message: 'User not match!'
+			})
 		} 
 
 		const temp = _.filter(house.rooms, function(data) {return data.totalRenter !== 0;});
@@ -300,7 +447,9 @@ router.get('/details/:id', (req,res,next) => {
 		Promise.map(temp, room => {
 			if (room.records.length!==0){
 				const lastPayment = _.last(room.records).paymentTime;
-				house.updatePaymentStatus(room._id, moment().isSame(lastPayment, "months"))
+				house.updatePaymentStatus(room._id, moment().isSame(lastPayment, "months") && _.last(room.records).payment)
+			} else {
+				house.updatePaymentStatus(room._id, false)
 			}
 		}).then(() => {
 			House.findOne({_id: id}).select("-rooms.records -rooms.renters").exec((err, result) => {
@@ -335,13 +484,13 @@ router.get('/form/house/:id', (req,res,next) => {
 
 		if(!house) {
 			return res.status(500).json({
-				error: {message: 'Can not find any house'}
+				message: 'Can not find any house'
 			})
 		}
 
 		if(house.creator.toString() !== decoded.sub) {
 			return res.status(500).json({
-				error: 'User not match!'
+				message: 'User not match!'
 			})
 		}
 
@@ -374,7 +523,7 @@ router.get('/form/house/:houseid/room/:roomid', (req,res,next) => {
 
 		if(house.creator.toString() !== decoded.sub) {
 			return res.status(500).json({
-				error: 'User not match!'
+				message: 'User not match!'
 			})
 		}
 
@@ -411,7 +560,7 @@ router.get('/form/house/:houseid/room/:roomid/renter/:renterid', (req,res,next) 
 
 		if(house.creator.toString() !== decoded.sub) {
 			return res.status(500).json({
-				error: 'User not match!'
+				message: 'User not match!'
 			})
 		}
 
@@ -443,7 +592,7 @@ router.get('/form/house/:houseid/room/:roomid/record/:recordid', (req,res,next) 
 
 		if(house.creator.toString() !== decoded.sub) {
 			return res.status(500).json({
-				error: 'User not match!'
+				message: 'User not match!'
 			})
 		}
 
@@ -494,7 +643,7 @@ router.get('/details/:houseid/:roomid', (req,res,next) => {
 //update house info with house id
 router.patch('/update/house/:id', (req,res,next) => {
 	const {id} = req.params;
-	const {ownersName, address, phoneNumber, rentalTargets, totalRoom} = req.body;
+	const {ownersName, address, phoneNumber, rentalTargets, totalRoom, paymentMethod} = req.body;
 	const decoded = jwt.decode(req.query.token);
 
 	House.findById(id, (err, house) => {
@@ -513,7 +662,7 @@ router.patch('/update/house/:id', (req,res,next) => {
 
         if(house.creator.toString() !== decoded.sub) {
 			return res.status(500).json({
-				error: 'User not match!'
+				message: 'User not match!'
 			})
 		}
                 
@@ -522,6 +671,7 @@ router.patch('/update/house/:id', (req,res,next) => {
         house.phoneNumber= phoneNumber;
         house.rentalTargets= rentalTargets;
         house.totalRoom = totalRoom;
+        house.paymentMethod = paymentMethod
 
         house.save((err, result)=> {
 			if (err) {
@@ -547,7 +697,7 @@ router.patch('/update/house/:houseid/room/:roomid', (req,res,next) => {
 
 		if(house.creator.toString() !== decoded.sub) {
 			return res.status(500).json({
-				error: 'User not match!'
+				message: 'User not match!'
 			})
 		}
 
@@ -566,7 +716,7 @@ router.patch('/update/house/:houseid/room/:roomid', (req,res,next) => {
 
 			if(house.creator.toString() !== decoded.sub) {
 				return res.status(500).json({
-					error: 'User not match!'
+					message: 'User not match!'
 				})
 			}
 
@@ -593,7 +743,7 @@ router.patch('/update/house/:houseid/room/:roomid/renter/:renterid', (req,res,ne
             })
         }     
 
-        const {fullName,cidNum,dob,homeTown,startRentingDate} = req.body;
+        const {fullName,cidNum,dob,homeTown,startRentingDate, email} = req.body;
         const {houseid, roomid, renterid} = req.params;
         const cidImages = [];
         const decoded = jwt.decode(req.query.token);
@@ -614,7 +764,7 @@ router.patch('/update/house/:houseid/room/:roomid/renter/:renterid', (req,res,ne
 
 		if(house.creator.toString() !== decoded.sub) {
 			return res.status(500).json({
-				error: 'User not match!'
+				message: 'User not match!'
 			})
 		}
 
@@ -632,7 +782,7 @@ router.patch('/update/house/:houseid/room/:roomid/renter/:renterid', (req,res,ne
 					house.rooms.id(roomid).renters.id(renterid).cidImages.push(data);
 					})
 				}).then( () => {
-					house.rooms.id(roomid).renters.id(renterid).set({fullName,cidNum,dob,homeTown,startRentingDate});
+					house.rooms.id(roomid).renters.id(renterid).set({fullName,cidNum,dob,homeTown,startRentingDate, email});
 					house.save((err, result)=> {
 						if (err) {
 	                		res.status(500).json({
@@ -643,7 +793,7 @@ router.patch('/update/house/:houseid/room/:roomid/renter/:renterid', (req,res,ne
 					});
 				});	
 		} else {
-			house.rooms.id(roomid).renters.id(renterid).set({fullName,cidNum,dob,homeTown,startRentingDate});
+			house.rooms.id(roomid).renters.id(renterid).set({fullName,cidNum,dob,homeTown,startRentingDate, email});
 			house.save((err, result)=> {
 				if (err) {
 	                res.status(500).json({
@@ -680,7 +830,7 @@ router.patch('/update/house/:houseid/room/:roomid/record/:recordid', (req,res,ne
 
 		if(house.creator.toString() !== decoded.sub) {
 			return res.status(500).json({
-				error: 'User not match!'
+				message: 'User not match!'
 			})
 		}
 		
@@ -718,7 +868,7 @@ router.delete('/delete/house/:houseid/room/:roomid/renter/:renterid/image/:publi
 
 		if(house.creator.toString() !== decoded.sub) {
 			return res.status(500).json({
-				error: 'User not match!'
+				message: 'User not match!'
 			})
 		}
 
@@ -767,7 +917,7 @@ router.delete('/delete/house/:houseid/room/:roomid/record/:recordid', (req,res,n
 
 		if(house.creator.toString() !== decoded.sub) {
 			return res.status(500).json({
-				error: 'User not match!'
+				message: 'User not match!'
 			})
 		}
 		
@@ -804,7 +954,7 @@ router.delete('/delete/house/:houseid/room/:roomid/renter/:renterid', (req,res,n
 
 		if(house.creator.toString() !== decoded.sub) {
 			return res.status(500).json({
-				error: 'User not match!'
+				message: 'User not match!'
 			})
 		}
 
@@ -870,7 +1020,7 @@ router.delete('/delete/house/:houseid/room/:roomid', (req,res,next) => {
 
 		if(house.creator.toString() !== decoded.sub) {
 			return res.status(500).json({
-				error: 'User not match!'
+				message: 'User not match!'
 			})
 		}
 
@@ -926,7 +1076,7 @@ router.delete('/delete/house/:houseid', (req,res,next)=>{
 
 		if(house.creator.toString() !== decoded.sub) {
 			return res.status(500).json({
-				error: 'User not match!'
+				message: 'User not match!'
 			})
 		}
 
