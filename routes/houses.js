@@ -444,15 +444,18 @@ router.get('/details/:id', (req,res,next) => {
 
 		const temp = _.filter(house.rooms, function(data) {return data.totalRenter !== 0;});
 		
-		Promise.map(temp, room => {
+		_.map(temp, room => {
 			if (room.records.length!==0){
-				const lastPayment = _.last(room.records).paymentTime;
+				const lastPayment = _.last(room.records).paymentTime;				
 				house.updatePaymentStatus(room._id, moment().isSame(lastPayment, "months") && _.last(room.records).payment)
 			} else {
 				house.updatePaymentStatus(room._id, false)
 			}
-		}).then(() => {
+		})
+			
+		setTimeout(function() {
 			House.findOne({_id: id}).select("-rooms.records -rooms.renters").exec((err, result) => {
+
 				if(err) {
 					return res.status(500).json({
 						message: 'There is some error',
@@ -461,11 +464,11 @@ router.get('/details/:id', (req,res,next) => {
 				}
 
 				return res.status(200).json({
-						rooms: result.rooms,		
-						message: 'Get Rooms Successfully'
+					rooms: result.rooms,		
+					message: 'Get Rooms Successfully'
 				})
-			})			
-		})		
+			})
+		}, 1000);			
 	})
 });
 
